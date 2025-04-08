@@ -8,12 +8,19 @@ salloc --time=1:00:00 --ntasks 1 --mem=100G --account=saarman-np --partition=saa
 
 ## Filter by Muller Element with grep
 ```
+cd /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff
+chmod -R g+w ./*
+
 bash
 zgrep "^#" glossina-full-scaffolds.vcf.gz > glossina-A-scaffolds.vcf.gz
 
+# test with A.txt
 while read scaffold; do
   zgrep -E "^${scaffold}\s" glossina-full-scaffolds.vcf.gz >> glossina-A-scaffolds.vcf
 done < A.txt
+
+
+chmod -R g+w ./*
 ```
 
 
