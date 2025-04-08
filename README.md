@@ -1,6 +1,10 @@
 # tsetseMolEcol
 Filter tsetse VCF file by Muller Element for Molecular Ecology Class Spring BIOL4750/6750
 
+Make sure to allocate resources before you start
+```
+salloc --time=1:00:00 --ntasks 1 --mem=100G --account=saarman-np --partition=saarman-shared-np
+```
 
 Filter with BCFtools
 ```
