@@ -12,7 +12,7 @@ bash
 zgrep "^#" glossina-full-scaffolds.vcf.gz > glossina-A-scaffolds.vcf.gz
 
 while read scaffold; do
-  zgrep -E "^${scaffold}\s" glossina-full-scaffolds.vcf.gz >> glossina-A-scaffolds.vcf.gz
+  zgrep -E "^${scaffold}\s" glossina-full-scaffolds.vcf.gz >> glossina-A-scaffolds.vcf
 done < A.txt
 ```
 
