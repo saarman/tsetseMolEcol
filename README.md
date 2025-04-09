@@ -57,28 +57,17 @@ bgzip *.vcf
 chmod -R g+w ./*
 ```
 
-## Filter with BCFtools, too many errors 
-```
-cd /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff
-chmod -R g+w ./*
+## The input files:
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina-full-scaffolds.vcf.gz
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/filter_vcf.slurm
 
-module load htslib
-bgzip glossina-full-scaffolds.vcf
-tabix -p vcf glossina-full-scaffolds.vcf.gz
-# error = sorting is needed before tabix
-
-bcftools sort glossina-full-scaffolds.vcf.gz -Oz -o glossina-full-scaffolds-sorted.vcf.gz
-# error = no scaffold numbers in header lines
-
-module load bcftools
-bcftools view -r A.txt glossina-full-scaffolds.vcf.gz -oZ glossina-A-scaffolds.vcf.gz
-# error = needs to be gz zipped
-```
-Where regions.txt contains one scaffold per line, or regions like:
-```
-scaffold_1
-scaffold_2:1-3842897
-```
-
-
-
+## The output files:
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_a-scaffolds.vcf
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_auto-scaffolds.vcf
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_b-scaffolds.vcf
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_c-scaffolds.vcf
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_d-scaffolds.vcf
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_e-scaffolds.vcf
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_f-scaffolds.vcf
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_na-scaffolds.vcf
+/uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_sex-scaffolds.vcf
