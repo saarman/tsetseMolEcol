@@ -58,10 +58,13 @@ chmod -R g+w ./*
 ```
 
 ## The input files:
+```
 /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina-full-scaffolds.vcf.gz
 /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/filter_vcf.slurm
+```
 
 ## The output files:
+```
 /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_a-scaffolds.vcf
 /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_auto-scaffolds.vcf
 /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_b-scaffolds.vcf
@@ -71,3 +74,4 @@ chmod -R g+w ./*
 /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_f-scaffolds.vcf
 /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_na-scaffolds.vcf
 /uufs/chpc.utah.edu/common/home/saarman-group1/MullingOverStuff/glossina_sex-scaffolds.vcf
+```
