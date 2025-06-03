@@ -1,0 +1,187 @@
+---
+title: 'Simulating Evolution with the Wright-Fisher Model'
+author: "Student Name"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+In this assignment, you will simulate genetic drift under the Wright-Fisher model using R. This simulation models evolution as a stochastic process, emphasizing the impact of random sampling on allele frequencies in finite populations.
+
+## Learning Goals: 
+ 1. Explore how population size influences genetic drift. 
+ 2. Visualize allele frequency trajectories across generations.
+ 3. Gain hands-on experience with R coding to simulate stochastic processes.
+ 
+# Warm-Up: Coin Toss Simulation
+Before diving into genetic drift, let’s revisit the concept of a binomial process with a coin toss example. In R, we’ll simulate flipping a coin 10 times for 5 trials.
+
+Relation to genetic drift? Each coin flip represents the survival of an allele, with probabilities determined by chance.
+
+## Code:
+```{r}
+set.seed(1) # For reproducibility
+results <- matrix(NA, nrow = 5, ncol = 10) 
+for (p in 1:5){
+  results[p,] <- sample(c("Head", "Tail"), 
+                        size = 10, replace = TRUE, 
+                        prob = c(0.5, 0.5))
+}
+results # View the results table
+```
+
+**Question:** What makes this simulation an accurate model of a binomial process? How does this relate to genetic drift?
+
+
+ 
+# Task 1: Simulate Genetic Drift (In Class)
+We will simulate genetic drift under the Wright-Fisher model for a diploid population of **100 individuals (2N = 200)**, starting with an allele frequency p = 0.1, tracked over **1000 generations**.
+
+## Code:
+
+```{r}
+# Parameters
+population_size <- 200 # Total alleles (2N)
+generations <- 1000 # Total generations
+initial_freq <- 0.1 # Initial allele frequency
+
+# Initialize vector to store allele frequencies
+allele_freq <- numeric(generations)
+allele_freq[1] <- initial_freq
+
+# Wright-Fisher Simulation
+set.seed(42) # For reproducibility
+for (gen in 2:generations) {
+  # Random sampling of alleles
+  allele_count <- rbinom(1, size = population_size, prob = allele_freq[gen - 1])
+  allele_freq[gen] <- allele_count / population_size
+}
+
+# Plot results
+plot(1:generations, allele_freq, type = "l", col = "blue", lwd = 2,
+     xlab = "Generation", ylab = "Allele Frequency",
+     main = "Genetic Drift Simulation (Task 1)")
+abline(h = c(0, 1), col = "red", lty = 2) # Fixation/loss lines
+``` 
+
+# Task 2: Multiple Simulations (Homework)
+Conduct **50 replicate** simulations under the same conditions as Task 1. Save the results in a matrix (50 rows, 1000 columns).
+
+## Code (Hint: Use a loop inside a loop)
+```{r}
+# Parameters
+
+# Initialize matrix for 50 simulations
+
+# Set initial frequency for all simulations
+
+# Simulate replicates
+
+``` 
+
+# Task 3: Plot Replicate Results (Homework)
+Visualize the trajectories from all 50 simulations. Plot each simulation as a line on the same graph.
+
+# Code (Hint: Use *plot()* for first simulation and *lines()* within a loop for the remaining simulations)
+
+```{r}
+# Plot the first simulation
+
+
+# Add remaining simulations
+
+```
+## Summarize results (Homework)
+ - How many simulations went to zero (loss of allele A)? 
+ - How many went to 1 (fixation of allele A)? 
+ - Calculate the proportion of simulations that went to fixation, and describe how this compare to your expectations based on the Wright-Fisher model of evolution.
+
+# Reflection Questions (Homework)
+ - How does population size influence the rate of fixation or loss?  
+ - Why do alleles fixate more quickly in smaller populations?
+ - What patterns did you observe across the 50 simulations? 
+ - How does the initial allele frequency affect outcomes?
+
+
+# Updated Task 1: Genetic Drift with Selection (Next Week in Class)
+
+## Updated Code:
+```{r}
+# Parameters
+
+# Initialize vector to store allele frequencies
+
+
+# Wright-Fisher Simulation with Selection
+
+# Plot results
+
+```
+
+# Updated Task 2: Multiple Simulations with Selection (Homework next week)
+Modify the multiple simulation setup to include selection. Use the same conditions as Task 2, but include a selection coefficient s=0.1. Save the results in a matrix (50 rows, 1000 columns).
+
+Then repeat the exercise, but this time with a negative selection coefficient s = -0.1.Save the results in a separate second matrix (50 rows, 1000 columns).
+
+## Updated Code with Positive Selection:
+```{r}
+# Parameters
+
+
+# Initialize vector to store allele frequencies
+
+
+# Initialize matrix for 50 simulations with positive selection
+
+
+# Simulate replicates with selection
+
+```
+
+## Updated Code with Negative Selection (Hint: make sure you don't overwrite your existing matrix for positive selection)
+```{r}
+# Parameters
+
+# Initialize matrix for 50 simulations with negative selection
+
+# Simulate replicates with selection
+
+```
+# Updated Task 3: Plot Results with Selection (Homework next week)
+Generate a plot with trajectories from the 50 simulations including positive selection and from 50 simulations including negative selection.
+
+## Updated Code Positive Selection:
+```{r}
+# Plot the first simulation
+
+# Add remaining simulations
+
+```
+## Updated Code Negative Selection (Hint: make sure you are using the correct results matrix for negative selection)
+```{r}
+# Plot the first simulation
+
+# Add remaining simulations
+
+```
+## Summarize results (Homework next week)
+ - How many simulations went to zero (loss of allele A) with positive and negative selection included? 
+ - How many went to 1 (fixation of allele A) with positive and negative selection included? 
+ - Calculate the proportion of simulations that went to fixation, and describe how this compare to your expectations based on the Wright-Fisher model of evolution.
+ - Compare your results both visually and quantitatively between the "with selection results to the drift-only simulations.
+ 
+# Updated Reflection Questions (Homework next week)  
+ - Compare fixation rates between Task 3 with drift-only and Updated Task 3 with selection. What changed, and why?
+ - How does selection influence the rate of fixation or loss compared to drift alone? 
+ - What patterns do you observe when selection and drift interact? 
+ - How does the strength of selection (s) impact the trajectories?
+ 
+ 
+## References
+-   <https://dk81.github.io/dkmathstats_site/rvisual-sidebyside-bar.html>
+-   Cotton, R. (2013) **Learning R:** A Step-by-Step Function Guide to Data Analysis. 1st edition. O’Reilly Media.
+-   Becker, R. A., Chambers, J. M. and Wilks, A. R. (1988) The New S Language. Wadsworth & Brooks/Cole.
+-   Ripley, B. D. (1987) Stochastic Simulation. Wiley.

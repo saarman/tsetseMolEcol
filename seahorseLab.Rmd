@@ -1,0 +1,89 @@
+---
+title: "Haplotype Diversity and AMOVA Analysis in R"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Introduction
+
+This RMarkdown document performs a haplotype diversity analysis and an Analysis of Molecular Variance (AMOVA) using sequences downloaded from GenBank. The analysis includes:
+
+- Downloading sequences from GenBank
+- Aligning sequences
+- Identifying haplotypes and calculating haplotype diversity
+- Conducting an AMOVA analysis
+- Incorporating an outgroup (H. kuda mitochondrial genome, NC010272.1, bp 15,580–16,008)
+
+## Load Required Packages
+
+```{r load-packages}
+library(ape)
+library(msa)
+library(pegas)
+library(ade4)
+library(Biostrings)
+```
+
+## Step 1: Download Ingroup Sequences from GenBank
+
+```{r download-ingroup}
+accessions <- paste0("GQ386", 655:769)
+ingroup_seqs <- read.GenBank(accessions)
+```
+
+## Step 2: Retrieve and Extract Outgroup Region
+
+```{r download-outgroup}
+# Download the full H. kuda mitochondrial genome
+outgroup_full <- read.GenBank("NC010272.1")
+# Extract sequence as character
+hg_seq <- outgroup_full[[1]]
+hg_char <- as.character(hg_seq)
+# Extract the specific region (bp 15,580–16,008)
+outgroup_region <- substring(hg_char, 15580, 16008)
+# Convert to DNAbin
+outgroup_vec <- strsplit(outgroup_region, split = "")[[1]]
+outgroup_dnabin <- as.DNAbin(outgroup_vec)
+```
+
+## Step 3: Combine Ingroup and Outgroup Sequences
+
+```{r combine-sequences}
+all_seqs <- c(ingroup_seqs, Outgroup = list(outgroup_dnabin))
+```
+
+## Step 4: Multiple Sequence Alignment
+
+```{r alignment}
+alignment <- msa(all_seqs, method = "Muscle")
+aligned_seqs <- as.DNAbin(alignment)
+```
+
+## Step 5: Haplotype Analysis and Diversity Calculation
+
+```{r haplotype-analysis}
+haps <- haplotype(aligned_seqs)
+hap_div <- hap.div(haps)
+print(hap_div)
+```
+
+## Step 6: AMOVA Analysis
+
+```{r amova-analysis}
+# Define grouping factor (ingroup vs outgroup)
+groups <- factor(c(rep("Ingroup", length(ingroup_seqs)), "Outgroup"))
+# Compute genetic distance matrix
+dna_dist <- dist.dna(aligned_seqs, model = "raw")
+# Perform AMOVA
+amova_result <- amova(dna_dist ~ groups)
+print(amova_result)
+```
+
+## Conclusion
+
+This analysis provides haplotype diversity estimates and tests genetic differentiation using AMOVA. Adjustments can be made to the sequence selection, grouping factors, and analysis methods to refine the results further.

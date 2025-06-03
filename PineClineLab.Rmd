@@ -1,0 +1,496 @@
+---
+title: "Pine Admixture and Genomic Cline"
+author: "Norah Saarman"
+date: "2025-04-04"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(adegenet)
+library(hierfstat)
+library(ggplot2)
+library(scatterplot3d)
+library(vcfR)
+library(LEA)
+library(bgchm)
+```
+# 1. Importing VCF Data
+
+The first step is to subsample just 5000 snps from the full dataset available on Dryad.
+I will perform and provide this file, but for your information:
+
+## 1A. Subsample SNPS to make more manageable (run separately before knitting)
+
+**Example: Subsampling SNPs Using VCFtools**
+
+For demonstration purposes, here's an example of how to subsample SNPs from a large VCF file using **vcftools**.
+This code is **not meant to be run within R**, but serves as a reference for working with large datasets (run separately before knitting).
+
+```{bash, eval=FALSE}
+bash
+module load vcftools
+# Step 1: Filter the original VCF to retain 
+# only high-quality SNPs, then randomly select 5000
+vcftools --gzvcf /uufs/chpc.utah.edu/common/home/saarman-group1/pine/diploid_Pydts_final.vcf.gz \
+        # Keep only variants with a maximum of 2 alleles (biallelic sites)
+         --max-alleles 2 \  
+        # Ensure variants have at least 2 alleles (i.e., they are not monomorphic)
+         --min-alleles 2 \
+        # Retain only sites with no missing genotypes
+         --max-missing 1.0 \      
+        # Exclude indels so that only SNPs remain
+         --remove-indels \
+        # Apply a minor allele frequency filter; retain SNPs with MAF >= 5%
+         --maf 0.01 \ 
+        # Recode (write out) a new VCF file that includes only the filtered sites
+         --recode \ 
+        # Include all INFO fields from the original VCF in the output
+         --recode-INFO-all \    
+        # Output the recoded VCF to standard output for further processing
+         --stdout | \  
+        # Remove VCF header lines (lines starting with "#") 
+         grep -v "^#" | \         
+        # Randomly select 5000 SNP records
+         shuf -n 5000 | \
+        # Extract the first two columns and save to a file
+         cut -f1,2 > random_snps.txt        
+
+# Step 2: Use the list of positions to create a new VCF containing only these 5000 SNPs.
+vcftools --gzvcf /uufs/chpc.utah.edu/common/home/saarman-group1/pine/diploid_Pydts_final.vcf.gz \
+        # Use the list of SNP positions from the first step
+         --positions random_snps.txt \  
+         # Recode (filter) the VCF to include only these positions
+         --recode \    
+         # Retain all the INFO fields from the original VCF
+         --recode-INFO-all \ 
+        # Write the output to a file with prefix 'pine_random_subset'
+         --out pine_random_subset        
+```
+
+*Note:* The output VCF (`pine_random_subset.recode.vcf`) will be provided to students on Canvas.
+
+## 1B. Import the VCF file as a genind object and subset individuals, take a peak at PCA
+```{r import}
+# Import from file
+vcf <- read.vcfR("pine_random_subset.recode.vcf")
+
+# Convert the VCF object to a genind object
+genind_obj <- vcfR2genind(vcf)
+
+# Extract population labels:
+# - regexpr("^[A-Za-z]+", ...) finds the match of 
+# one or more letters at the beginning of each name
+# - regmatches() extracts that matching substring.
+pop_labels <- regmatches(indNames(genind_obj), regexpr("^[^-_]+", indNames(genind_obj)))
+
+#replace Ps01-Ps08 with Ps
+pop_labels <- gsub("^Ps\\d+", "Ps", pop_labels)
+
+# Assign the extracted labels as pop names
+pop(genind_obj) <- pop_labels
+
+# Which 17 pops should be included? 
+# Only confident about 13 of them...
+genind_sub <- genind_obj[genind_obj@pop %in% c("ZXPd02",
+  "ZXPd03", "ZXPd04", "XCPd03", "DQPd02","BCPy03", 
+  "GSPy04", "JLPy02", "LJPy02", "WSPy01", "WXPy01", 
+  "ZDPy06","ZDPy07")]
+```
+
+Visualize genetic variation with PCA
+```{r pca}
+# Compute PCA on the subset
+pca_result3 <- dudi.pca(genind_sub, cent = FALSE, 
+    scale = TRUE, scannf = FALSE, nf = 4)
+
+# Choose colors by site/pop
+colors <- c(colorRampPalette(c("red", "orange",
+  "yellow"))(5),colorRampPalette(c("blue", "cyan",
+  "purple"))(10))
+site_colors <- c("ZXPd02"=colors[1], 
+                 "ZXPd03"=colors[2], 
+                 "ZXPd04"=colors[3], 
+                 "XCPd03"=colors[4], 
+                 "DQPd02"=colors[5], 
+                 "BCPy03"=colors[6], 
+                 "GSPy04"=colors[8], 
+                 "JLPy02"=colors[9], 
+                 "LJPy02"=colors[10], 
+                 "WSPy01"=colors[11], 
+                 "WXPy01"=colors[12], 
+                 "ZDPy06"=colors[13], 
+                 "ZDPy07"=colors[14])
+
+# Extract population codes 
+pop_codes <- as.character(pop(genind_sub))
+
+# Index the named color vector by the pop_group
+# by sampled site
+pop_colors <- site_colors[pop_codes]
+
+# Define layout: Two columns, the second column 
+# is reserved for the legend
+layout(matrix(c(1, 2), nrow = 1), 
+       widths = c(3.5,0.5))  # 7:1 ratio
+
+# First panel: PCA plot
+par(mar = c(5, 4, 4, 2))  # Reset margins
+plot(pca_result3$li[,1:2],
+     col = pop_colors,
+     pch = 19,
+     xlab = "PC1",
+     ylab = "PC2",
+     main = "PCA - Hybrid Cline")
+
+# Second panel: Legend (ensures it appears on the right)
+par(mar = c(5, 0, 4, 0))  # Remove margins
+plot.new()  # Create an empty plot space
+legend("center", 
+       legend = names(site_colors),
+       col = site_colors,
+       pch = 19,
+       cex = 0.8,
+       title = "Populations")
+```
+
+# 2. ADMIXTURE
+
+## 2A. Create input for LEA from genind (MUST run before knitting)
+```{r lea, eval = FALSE}
+# Function to convert a genind object to STRUCTURE format
+convert_genind_to_structure <- function(genind_obj, output_file) {
+  geno_matrix <- tab(genind_obj, NA.method = "mean")  # Convert genind to numeric matrix
+  pop_ids <- pop(genind_obj)  # Extract population information
+  
+  # Ensure diploid data is structured correctly
+  structure_matrix <- as.data.frame(geno_matrix)
+  structure_matrix <- cbind(pop_ids, structure_matrix)  # Add population IDs
+  
+  # Write to file without quotes, suitable for STRUCTURE
+  write.table(structure_matrix, output_file, 
+        quote = FALSE, row.names = FALSE, 
+        col.names = FALSE, sep = " ")
+}
+
+# Convert and save STRUCTURE format file
+convert_genind_to_structure(genind_sub, "lea_input.str")
+
+```
+
+## 2B. Write geno file and run Admixture analysis with sNMF (MUST run before knitting)
+
+```{r lea-snmf, eval = FALSE}
+# Convert and write to file STRUCTURE format 
+# to a LEA-compatible matrix
+struct2geno("lea_input.str", ploidy = 2, 
+            FORMAT = 1, extra.column = 1)
+
+# Define range of K values
+k_values <- 2:6  # Adjust as needed
+
+# Run sNMF for each K
+project <- snmf("lea_input.str.geno", 
+                K = k_values, entropy = TRUE, 
+                repetitions = 10, ploidy = 2, 
+                project = "new")
+
+# Run cross_entropy and save object
+cross_entropy_values <- sapply(k_values, 
+        function(k) cross.entropy(project, K = k))
+
+# Save a single object to a file
+saveRDS(cross_entropy_values, "cross_entropy_values.rds")
+```
+
+Plot cross-entropy to visualize and decide which is best K value
+```{r lea-cross-entropy}
+# Define range of K values
+k_values <- 2:6  # Adjust as needed
+
+# Restore necessary data
+cross_entropy_values <- readRDS(file = "cross_entropy_values.rds")
+
+# Plot cross-entropy to visualize model selection
+plot(k_values, cross_entropy_values[1,], 
+     type = "b", pch = 19, col = "blue",
+     xlab = "Number of Clusters (K)", 
+     ylab = "Cross-Entropy",
+     main = "LEA Model Selection", 
+     ylim = c(min(cross_entropy_values),
+              max(cross_entropy_values)))
+for (i in 2:10) { # Overlay replicates
+  lines(k_values, cross_entropy_values[i,], col = "gray")
+}
+```
+## 2C. Plot each K-value with randomly sampled which replicate run to use
+```{r lea-plot}
+# Define range of K values
+k_values <- 2:6  # Adjust as needed
+
+project = load.snmfProject("lea_input.str.snmfProject")
+
+run_num <- sample(1:10,1) # random run to use
+mycols = c("#32004B","#0398E5","#FE6400",
+           "#0C650A","#98184B","#FDB0B0",
+           "#FE004B","#319732","#FC9500",
+           "#836C2A","#E5FE01","#6B09AA", 
+           "#4106F7","#ABDDA4","#298DEF",
+           "#BABA36","#FED790","#FE6804", 
+           "red","purple","pink","grey",
+           "blue","green","gold")
+
+for (k in k_values) {
+  # Extract admixture proportions for each K
+  qmatrix <- as.data.frame(Q(project, K = k, run = run_num))
+  
+  # Save the admixture proportions for downstream analysis
+  write.table(qmatrix, paste0("lea_admixture_k", k, ".txt"), 
+              quote = FALSE, row.names = FALSE, 
+              col.names = TRUE)
+
+  # Create barplot with population labels
+  bp <- barplot(t(as.matrix(qmatrix)), beside = FALSE, 
+                col = mycols[1:(ncol(qmatrix))],
+                ylab = "Ancestry Proportion",
+                main = paste("Admixture Proportions for K =", k),
+                border = NA, space = 0, xaxt = "n")  # Suppress default x-axis
+
+  # Add population names along x-axis
+  axis(1, at = bp, labels = pop(genind_sub), 
+       las = 2, cex.axis = 0.8)  # Rotate for readability
+}
+
+```
+## 2D. Interpret Admixture Analysis:
+
+-   What is the best-supported number of clusters (K) based on the cross-entropy plot?
+-   How do individual admixture proportions vary across clusters?
+-   Are there signs of recent hybridization based on mixed ancestry?
+
+# 3. Genomic Cline Analysis
+
+Genomic clines describe the change in allele frequency across hybrid zones.
+Loci that deviate from expected cline patterns may be under selection, indicating adaptive introgression, barriers to gene flow, or asymetrical gene flow due to spatial/historical contingency.
+
+## 3A. Prepare genotype matrix for p0, p2, and hx hybrid cline from genind_sub object
+```{r prepare-genotypes}
+# Function to convert genotype codes to numeric values
+genind2bgc <- function(genind_obj) {
+  geno_df <- genind2df(genind_obj,sep="")[, -1]  # Remove pop ID column
+  geno_df[geno_df == "00"] <- 0
+  geno_df[geno_df == "01" | geno_df == "10"] <- 1
+  geno_df[geno_df == "11"] <- 2
+  geno_numeric <- as.matrix(apply(geno_df, 2, as.numeric))
+  rownames(geno_numeric) <- NULL
+  colnames(geno_numeric) <- NULL
+  return(geno_numeric)
+}
+
+#for 100 loci
+loci_subset <- 1:200
+
+# Subset first 100 loci and populations and 
+# convert to numeric format with function
+geno_p0 <- genind2bgc(genind_sub[genind_sub@pop == "BCPy03",loci_subset])
+geno_p1 <- genind2bgc(genind_sub[genind_sub@pop == "ZXPd02",loci_subset])
+geno_cline <- genind2bgc(genind_sub[genind_sub@pop != c("BCPy03", "ZXPd02"),loci_subset])
+```
+
+## 3B. Hybrid Indexes (MUST run before knitting)
+```{r h-index, eval = FALSE}
+## estimate parental allele frequencies,
+## uses default HMC settings
+p_out<-est_p(G0=geno_p0,G1=geno_p1,
+             model="genotype",ploidy="diploid")
+
+## estimate hybrid indexes, uses 
+## default HMC settings and point estimates
+## (posterior medians) of allele frequencies
+h_out<-est_hi(Gx=geno_cline,p0=p_out$p0[,1],
+  p1=p_out$p1[,1],model="genotype",ploidy="diploid")
+
+# Save hybrid index results
+write.table(h_out$hi, "bgc_hybrid_index.txt", 
+    quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+# Save a single object to a file
+saveRDS(h_out, "h_out.rds")
+```
+
+## 3C. Genomic Clines (MUST run before knitting)
+
+```{r genomic-clines, eval = FALSE}
+# Estimate genomic clines
+gc_out<-est_genocl(Gx=geno_cline,
+       p0=p_out$p0[,1],
+       p1=p_out$p1[,1],
+       H=h_out$hi[,1],
+       model="genotype",
+       ploidy="diploid",
+       hier=TRUE,
+       n_iters=4000)
+
+# Save a single object to a file
+saveRDS(gc_out, "gc_out.rds")
+```
+## 3D. Interspecific Ancestry (MUST run before knitting)
+Interspecific ancestry for the same data set, this can be especially informative about the types of hybrids present:
+```{r ancestry, eval = FALSE}
+q_out<-est_Q(Gx=geno_cline,p0=p_out$p0[,1],p1=p_out$p1[,1],model="genotype",ploidy="diploid")
+
+# Save a single object to a file
+saveRDS(q_out, "q_out.rds")
+```
+
+## 3E. Plot H-index, Genomic clines, Interspecific ancestry 
+
+First restore necessary data objects from runs above.
+```{r plot-bgchm}
+# Restore necessary data
+h_out <- readRDS(file = "h_out.rds")
+gc_out <- readRDS(file = "gc_out.rds")
+q_out <- readRDS(file = "q_out.rds")
+```
+Plot hybrid index estimates with 90% equal-tail probability intervals sorted by hybrid index, just a nice way to visualize:
+```{r plot-h}
+plot(sort(h_out$hi[,1]),
+     ylim=c(0,1),pch=19,
+     xlab="Individual (sorted by HI)",
+     ylab="Hybrid index (HI)")
+segments(1:100,h_out$hi[order(h_out$hi[,1]),3],
+         1:100,h_out$hi[order(h_out$hi[,1]),4])
+```
+How variable is introgression among loci? Lets look at the cline SDs these are related to the degree of coupling among loci overall:
+```{r gc-SD}
+gc_out$SDc
+gc_out$SDv
+```
+Examine a plot of the joint posterior distribution for the SDs:
+```{r pp_plot}
+pp_plot(objs=gc_out,param1="sdv",param2="sdc",probs=c(0.5,0.75,0.95),colors="black",addPoints=TRUE,palpha=0.1,pdf=FALSE,pch=19)
+```
+
+Impose sum-to-zero constraint on log/logit scale not totally necessary, but this is mostly a good idea:
+```{r sz-out}
+sz_out<-sum2zero(hmc=gc_out$gencline_hmc,
+                 transform=TRUE,ci=0.90)
+```
+
+Plot genomic clines for the 51 loci, first without the sum-to-zero constraint then with it... these differ more for some data sets than others:
+```{r gencline}
+# without sum-to-zero constraint
+gencline_plot(center=gc_out$center[,1],
+              v=gc_out$gradient,pdf=FALSE,
+              main = "No sum-to-zero constraint")
+# with sum-to-zero contraint
+gencline_plot(center=sz_out$center[,1],
+              v=sz_out$gradient,pdf=FALSE,
+              main = "With sum-to-zero constraint")
+```
+
+Summarize loci with credible deviations from genome-average gradients, here the focus is specifically on steep clines indicative of loci introgressing LESS than the average:
+```{r gradient}
+which(sz_out$gradient[,2] >.5) ## index for loci with steep clines (changed from 1)
+sum(sz_out$gradient[,2] > .5) ## number of loci with steep clines (changed from 1)
+```
+
+Plot interspecific ancestry for the same data set, this can be especially informative about the types of hybrids present:
+```{r tri_plot}
+## plot the results
+tri_plot(hi=q_out$hi[,1],
+         Q10=q_out$Q10[,1],
+         pdf=FALSE,pch=19)
+```
+Note that some individuals appear to be likely backcrosses (close to the outer lines of the triangles) but the individuals with intermediate hybrid indexes are clearly not F1s but rather late gen.
+
+## 3F. Interpretation
+- Loci with extreme **alpha values** suggest selection acting on ancestry.
+- Loci with extreme **beta values** suggest non-neutral introgression.
+- **Outlier loci** with significant deviations indicate potential regions under selection or barriers to introgression.
+
+# 4. Bringing it all together
+
+## 4A. Class Discussion: Understanding Genomic Clines. 
+
+ 1. How do genomic clines compare to other measures of population structure (e.g., PCA, admixture analysis)?  
+ - What biological factors (selection, linkage, gene flow) might explain steep vs. shallow genomic clines?  
+ - How does the width of genomic clines relate to selection strength?  
+ - Comparing Different Analytical Approaches
+
+ 2. How do genomic clines differ from admixture proportions in interpreting hybridization?  
+ - Could genomic clines provide more fine-scale information than Fst-based outlier detection?  
+ - How might introgression patterns differ when looking at individual vs. genome-wide ancestry?  
+ 
+3. Interspecific Ancestry & Identifying HybridS. 
+- How does the triangular plot of interspecific ancestry help differentiate F1 hybrids from later-generation hybrids?
+ - Why are F1 hybrids expected to fall at the center of the triangle, while backcrosses are closer to the edges?
+ - Do we observe clear F1 hybrids in the dataset, or is the hybrid population composed mostly of backcrosses?
+ - How does interspecific ancestry relate to barriers to gene flow?
+
+## 4B. Interpretation Exercise
+
+Write a paragraph explaining:
+
+-   PCA Results: What patterns do you observe? Do clusters correspond to known population labels?  
+-   Admixture Analysis: What is the best-supported number of clusters (K)? Do individuals show evidence of hybrid ancestry?  
+-  Genomic Cline Outliers: Which loci have steep clines? How do these compare to neutral loci?  
+-  Evolutionary Mechanisms: What could explain these patterns? (e.g., selection, barriers to gene flow, recent admixture, range shifts). 
+-  Comparison Across Methods: Do genomic clines agree or conflict with PCA/admixture results? What does this tell us about hybrid zone dynamics?  
+-  Identifying Hybrid Generations: Based on the triangular plot of interspecific ancestry, do we see clear F1 hybrids, or are individuals mostly backcrosses? What does this suggest about the stability and directionality of introgression?
+
+# References
+-   https://github.com/zgompert/bgc-hm
+-   Guo, Y., Smith, J., & Anderson, C. (2023). *Genomic clines and genotype-by-environment associations*. *Evolutionary Ecology*, 37(2), 123-135.
+-   Schweizer, R. M., Saarman, N. P., Ramstad, K. M., Forester, B. R., Kelley, J. L., Hand, B. K., Malison, R. L., Ackiss, A. S., Watsa, M., & Nelson, T. C. (2021). *Big Data in Conservation Genomics: Boosting Skills, Hedging Bets, and Staying Current in the Field*. *Journal of Heredity*, 112(4), 313–327. <https://doi.org/10.1093/jhered/esab019>
+
+
+# OPTIONAL EXAMPLE: Looping through sets of 500 loci for a larger dataset
+```{r, eval = FALSE, include = FALSE}
+
+# Define total number of loci and subset size
+num_loci <- nLoc(genind_sub)  # Get total number of loci in dataset
+subset_size <- 1000  # Number of alleles (2X loci) per iteration
+num_iterations <- 10  # Number of subsets to process
+
+# Generate loci subsets
+set.seed(123)  # For reproducibility
+loci_sets <- split(sample(1:num_loci), rep(1:num_iterations, each=subset_size))
+
+# Loop through 10 subsets
+for (i in 1:num_iterations) {
+  
+  # Define loci subset
+  loci_subset <- loci_sets[[i]]
+  
+  # Convert genind object to bgc-compatible format
+  geno_p0 <- genind2bgc(genind_sub[genind_sub@pop == "BCPy03", loci_subset])
+  geno_p1 <- genind2bgc(genind_sub[genind_sub@pop == "ZXPd02", loci_subset])
+  geno_cline <- genind2bgc(genind_sub[genind_sub@pop != c("BCPy03", "ZXPd02"), loci_subset])
+  
+  # Estimate parental allele frequencies
+  p_out <- est_p(G0 = geno_p0, G1 = geno_p1, model = "genotype", ploidy = "diploid")
+  
+  # Estimate hybrid indexes
+  h_out <- est_hi(Gx = geno_cline, p0 = p_out$p0[,1], p1 = p_out$p1[,1],
+                  model = "genotype", ploidy = "diploid")
+
+  # Save hybrid index results
+  write.table(h_out$hi, paste0("bgc_hybrid_index_", i, ".txt"), quote = FALSE, row.names = FALSE, col.names = FALSE)
+  saveRDS(h_out, paste0("h_out_", i, ".rds"))
+
+  # Estimate genomic clines
+  gc_out <- est_genocl(Gx = geno_cline, p0 = p_out$p0[,1], p1 = p_out$p1[,1],
+                       H = h_out$hi[,1], model = "genotype", ploidy = "diploid",
+                       hier = TRUE, n_iters = 4000)
+
+  # Save genomic cline results
+  saveRDS(gc_out, paste0("gc_out_", i, ".rds"))
+
+  print(paste("Iteration", i, "completed."))
+}
+```
+

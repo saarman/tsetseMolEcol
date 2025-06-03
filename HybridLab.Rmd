@@ -1,0 +1,443 @@
+---
+title: "Hibridization"
+author: "Norah Saarman"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(adegenet)
+library(hierfstat)
+library(ggplot2)
+library(vcfR)
+library(LEA)
+library(ggplot2)
+```
+
+# Day 1: Hardy-Weinberg Equilibrium and FIS Analysis
+
+## Introduction
+
+In this lab, we will explore the Hardy-Weinberg (HW) principle, estimate fixation indices (FIS), and analyze genetic data to understand patterns of heterozygosity and potential deviations from HW equilibrium. We will focus on understanding the effects of hybridization, population structure, and inbreeding.
+
+## Learning Goals
+
+- Understand the HW principle, its assumptions, and its applications.
+- Test for HW equilibrium using real genetic datasets.
+- Estimate locus-by-locus FIS and interpret deviations from HW expectations.
+- Identify genetic signatures of hybridization, inbreeding, and population structure.
+
+# Background
+
+The HW principle states that allele frequencies in a population remain constant across generations in the absence of evolutionary forces. The fixation index (FIS) helps identify deviations from HW equilibrium.
+
+## The Hardy-Weinberg (HW) principle
+At Hardy-Weinberg equilibrium, (i) allele frequencies in a population will remain constant indefinitely, and (ii) genotypic proportions occur at Hardy-Weinberg proportions in the population as determined by the “square law”. 
+
+What is the “square law”? Think of the Punnett Square you learned about in introductory genetics. Consider a single locus with two alleles A1 and A2. 
+
+Let:	
+  p = frequency of A1 allele  
+  q = frequency of A2 allele
+
+Three genotypes are thus possible: A1A1, A1A2, and A2A2. 
+  
+Let:  
+  P = frequency of A1A1 homozygote  
+  H = frequency of A1A2 heterozygote  
+  Q = frequency of A2A2 homozygote\newline
+  
+From the frequencies, we can estimate allele frequencies:   
+  p = P + ½ H  
+  q = Q + ½ H\newline
+  
+These frequencies will sum to 1, since there are only 2 alleles present:  
+  p + q = 1\newline  
+  
+The frequencies of the alleles have not changed, and the genotypic proportions are determined by the “square law”. For two alleles, genotypic proportions are given by expanding the term (p+q)^2.
+
+## Assumptions of the HW principle
+
+The reason the Hardy-Weinberg equilibrium is useful to us is that for evolutionary change to occur in a population, it is necessary for one or more specific assumptions to be violated. We can use information about the way the population deviates from HW expectations to understand which assumptions have been violated (and thus the relative importance of different forces of evolutionary change). What are these assumptions?
+
+1)	Generations are discrete (i.e. non-overlapping)
+2)	The species is diploid
+3)	Reproduction is sexual
+4)	The gene being considered has 2 alleles
+5)	Allele frequencies are the same in males and females
+6)	Mating is random
+7)	The population size is infinite (i.e. no genetic drift)
+8)	There is no migration (gene flow)
+9)	There is no mutation
+10)	There is no selection
+
+## The fixation index (FIS) and interpretation
+
+Since the Hardy-Weinberg principle predicts that no evolution will occur unless one of the above assumptions is violated, it is often useful to test if a population is in HW equilibrium and use information about the way the population deviates from HW expectations to understand which assumptions have been violated. In other words, deviations from HW expectations can help to determine the relative importance of random drift, migration, mutation, and natural selection in affecting the frequency of genetic polymorphism in natural populations. 
+
+FIS (Nei, 1987) provides a simple way of summarizing in what direction the frequency of genetic polymorphism in natural populations deviate from HW equilibrium. FIS is based on a comparison of observed heterozygosity (Hobs) and the HW expected heterozygosity (Hexp) given the allele frequencies in the population:
+
+FIS = 1 - (Hobs/Hexp)\newline
+  
+**Negative FIS indicates a homozygote deficit and heterozygote excess. Some of many potential causes of heterozygote excess include:**   
+
+* Small population size, this is because allele frequencies are likely to differ between sexes just due to chance.
+* Negative assortative mating when reproduction occurs between individuals bearing phenotypes more dissimilar than by chance.
+* Heterozygote advantage, something that sometimes occurs in hybrid zones
+* Selection, this can occur in cases of balancing selection, but usually occurs in only a small proportion of the genome.
+* See the list of assumptions and let your mind run!
+
+**Positive FIS indicates a homozygote excess and heterozygote deficit. Some of many potential causes of heterozygote deficit include:**
+
+* Inbreeding, this is because matings between close relatives are more likely to result in pairing even rare alleles in homozygote form.
+* Population structure, this is because of the “Wahlund effect”, where two or more subpopulations are in Hardy-Weinberg equilibrium but have different allele frequencies such that the overall heterozygosity is reduced compared to if the whole population was in equilibrium.
+* Selection, this can occur in cases of directional selection because alleles that have a selective advantage are more likely to be in homozygous than heterozygous form. Note that these alleles are also more likely to go to fixation unless there is clinal variation, frequency-dependence, or other processes that maintain both alleles.
+* Technical issues, for example miss-scoring of heterozygotes as homozygotes because of low next-gen sequencing read depth.
+* See the list of assumptions and think through the logical consequences!
+
+
+## Part 1: Analyzing Genetic Datasets
+
+There are population-level data from four scenarios in the input file, your goal is to perform several analyses on these datasets and identify which dataset A-D matches scenarios 1-4.\newline
+
+Four Scenarios:  \newline
+1)	Marten dataset from the admixture zone in Idaho  
+2)	Marten dataset from a healthy population north of the admixture zone  
+3)	Bull trout SNP dataset with very small Ne  
+4)	Rainbow trout SNP dataset from a genome-wide association study  \newline
+
+### Importing Data
+
+```{r import-data}
+# Import data in genepop format
+myData <- read.genepop("HW_FourScenarios.gen", ncode = 2, quiet = TRUE)
+
+# Assign population labels (A-D)
+pop_list <- as.factor(c(rep("A", 25), rep("B", 25), rep("C", 25), rep("D", 25)))
+myData@pop <- pop_list
+```
+
+### Basic Statistics and FIS Calculation
+
+```{r basic-stats}
+# Calculate basic statistics for each scenario
+statsA <- basic.stats(myData[myData@pop == "A"])
+statsB <- basic.stats(myData[myData@pop == "B"])
+statsC <- basic.stats(myData[myData@pop == "C"])
+statsD <- basic.stats(myData[myData@pop == "D"])
+
+# Display overall FIS for Scenario A
+statsA$overall
+```
+
+### Plotting FIS per Locus
+
+```{r plot-fis}
+# Plot FIS per locus for Scenario A
+plot(statsA$perloc$Fis, main = "Scenario A", xlab = "Locus", ylab = "FIS")
+abline(h = statsA$overall["Fis"], col = "red")
+```
+
+### Discussion Questions
+
+1. What trends do you observe in the basic statistics output?
+2. What are the overall expected heterozygosity, observed heterozygosity, and FIS?
+3. Are there loci with significant deviations from HW expectations?
+4. What biological processes might explain these patterns?
+
+## Part 2: Interpretation Exercise for Day 1
+
+After completing the analysis, write a short paragraph explaining whether your dataset shows signs of:
+
+- **Inbreeding**: Indicated by a consistent heterozygote deficit (positive FIS).
+- **Population Structure (Wahlund Effect)**: Indicated by a high FIS due to subpopulation differences.
+- **Hybridization/Introgression**: Indicated by heterozygote excess or complex FIS patterns.
+
+## Self-Assessment Questions
+
+- What did you learn about HW equilibrium in the context of hybridization?
+- How would you apply these concepts in conservation genetics?
+
+
+# Day 2: Simulating and Interpreting Signals of Hybridization from Population Genetics Data
+
+## Introduction
+
+In this session, we will simulate genetic datasets to understand the impacts of inbreeding, population structure, and hybridization on genetic variation. This hands-on activity will reinforce concepts from Day 1 and help differentiate between genetic signals in population data.
+
+## Learning Goals
+
+- Simulate genetic datasets to explore the effects of inbreeding and population structure on HW equilibrium.
+- Distinguish between genetic signals of inbreeding, population structure (Wahlund effect), and hybridization.
+- Apply PCA to visualize population structure and interpret FIS values in simulated datasets.
+
+## Background
+
+Hybridization, inbreeding, and population structure can all produce deviations from HW expectations. Simulating these scenarios allows us to observe their unique genetic signatures and learn how to differentiate them in real data.
+
+## Part 3: Simulating Genetic Data
+
+### Simulating Inbreeding
+First, let's simulate inbreeding:\newline
+```{r simulate inbreeding with heirfstat}
+# simulate inbreeding
+iSim <- sim.genot(size=100,nbal=8,nbloc=15,nbpop=1,N=1000,mut=0.001,f=0.2) # simulate
+colnames(iSim) <- NULL # replace column names with null to make adegenet happy
+iData <- df2genind(iSim[-1], ncode=1) # convert to adegenet genind object
+iData@pop <- as.factor(rep("Inbreeding",100)) # fill in "@pop" of genind object (for hierfstat)
+```
+
+Now, let's simulate restricted gene flow (population structure):\newline
+```{r simulate restricted gene flow with heirfstat}
+# simulate population structure dataset
+sSim <- sim.genot.metapop.t(size=50,nbal=8,nbloc=15,nbpop=2,N=50,
+      mig=matrix(c(1,0,0,1),nrow=2,byrow=TRUE),f=0.01,mut=0.01,t=1000) # simulate
+colnames(sSim) <- NULL # replace column names with null to make adegenet happy
+sData <- df2genind(sSim[-1], ncode=1) # convert to adegenet genind object
+sData@pop <- as.factor(rep("Structure",100)) # fill in "@pop" of genind object (for hierfstat)
+```
+
+What are the major parameter choices for the simulation of both datasets? Is there anything you would change with less limited computation time?\newline
+
+## Analyzing Simulated Data - FIS Calculation and PCA
+
+Within yourgroup, use the R package “hierfstat” following the code below to estimate and plot basic statistics including FIS, and visualize the genetic structure present in the simulated datasets. Then answer the following question (also listed in the Rmd file, feel free to type into the Rmd save it for your records):\newline
+```{r view basic stats for each, out.width='50%'}
+# basic stats
+iStats <- basic.stats(iData)
+iStats 
+sStats <- basic.stats(sData)
+sStats 
+
+# FIS plots 
+plot(iStats$perloc$Fis,xlab = "locus", ylab = "Fis", main = "Inbreeding")
+abline(h=iStats$overall[9],col="red")
+plot(sStats$perloc$Fis,xlab = "locus", ylab = "Fis", main = "Structure")
+abline(h=sStats$overall[9],col="red")
+
+# PCA Analysis
+iPCA <- dudi.pca(iData, cent=FALSE, scale=TRUE, scannf=FALSE, nf=4)
+sPCA <- dudi.pca(sData, cent=FALSE, scale=TRUE, scannf=FALSE, nf=4)
+
+# Plotting PCA
+plot(iPCA$li, main="PCA of Inbreeding Simulation")
+plot(sPCA$li, main="PCA of Structured Population Simulation")
+```
+Do you think there is an overall heterozygote excess or defecit in these two datasets? What do you think caused this excess/deficit in each case?\newline
+
+Are there any obvious differences between the output for these different simulations? What can we do to distinguish between the possible causes (population structure and inbreeding)?\newline
+
+One idea for this is to run a principal component analysis on the simulated genotypes and visualize (plot) the eigenvectors to see how the individuals cluster...Is there any population structure?\newline
+
+First let's plot the PCA eigenvalues and eigenvectors from the simulation with inbreeding:\newline
+```{r PCA with adegenet, out.width='50%'}
+# PCA for simulation with inbreeding
+iPCA <- dudi.pca(iData,cent=FALSE,scale=TRUE,scannf=FALSE,nf=4)
+barplot(iPCA$eig[1:50],main="PCA eigenvalues", col=heat.colors(50)) # view eigenvalues
+s.label(iPCA$li) # plot eigenvectors
+```
+
+Now, let's plot the PCA eigenvalues and eigenvectors from the simulation with restricted gene flow:
+```{r PCA with adegenet structured, out.width='50%'}
+# PCA for structured
+sPCA <- dudi.pca(sData,cent=FALSE,scale=TRUE,scannf=FALSE,nf=4)
+barplot(sPCA$eig[1:50],main="PCA eigenvalues", col=heat.colors(50)) # view eigenvalues
+s.label(sPCA$li)
+```
+
+Do you see the population structure in the one dataset and not the other? What other analysis would you want to do if this were your own thesis to prove to yourself there is population structure rather than inbreeding?\newline
+
+One idea here is to estimate FIS again after separating these putative clusters. Does the signal of FIS go away?
+
+```{r basic stats for separate clusters of structured dataset, out.width='50%'}
+grpA <- sData[sPCA$li$Axis2>0]
+grpB <- sData[sPCA$li$Axis2<0]
+
+# basic stats
+aStats <- basic.stats(grpA)
+aStats 
+bStats <- basic.stats(grpB)
+bStats 
+
+# FIS plots 
+plot(aStats$perloc$Fis,xlab = "locus", ylab = "Fis", main = "Structured - A")
+abline(h=aStats$overall[9],col="red")
+plot(bStats$perloc$Fis,xlab = "locus", ylab = "Fis", main = "Structured - B")
+abline(h=bStats$overall[9],col="red")
+```
+
+After separating the dataset into two clusters and estimating FIS again for each putative cluster, does the signal of high FIS go away? Why/why not?\newline
+
+To illustrate what would happen if the underlying cause really were FIS not structured populations, we can run the same analysis with the simulation with inbreeding:
+```{r basic stats for forced clustering from inbred simulation, out.width='50%'}
+grpC <- iData[iPCA$li$Axis2>0]
+grpD <- iData[iPCA$li$Axis2<0]
+
+# basic stats
+cStats <- basic.stats(grpC)
+cStats 
+dStats <- basic.stats(grpD)
+dStats 
+
+# FIS plots 
+plot(cStats$perloc$Fis,xlab = "locus", ylab = "Fis", main = "Inbreeding - C")
+abline(h=cStats$overall[9],col="red")
+plot(dStats$perloc$Fis,xlab = "locus", ylab = "Fis", main = "Inbreeding - D")
+abline(h=dStats$overall[9],col="red")
+```
+
+This time, after separating the dataset artificially into two clusters and estimating FIS again for each putative cluster, does the signal of high FIS go away? Why/why not?\newline
+
+Can you imagine a scenario where it may be difficult to distinguish the cause of a high value of FIS? What might this be?\newline
+
+### Interpretation Exercise
+
+Write a paragraph explaining whether your simulated dataset shows signs of:
+
+- **Inbreeding**: High FIS with no clear population structure in PCA.
+- **Population Structure**: High FIS with clear clusters in PCA.
+- **Hybridization**: Patterns that reflect both heterozygote excess and mixed ancestry.
+
+
+## Part 4: Real-World Example - Pine Hybrid Zone
+
+### Importing VCF Data
+The first step is to subsample just 5000 snps from the full dataset available on Dryad. I will perform and provide this file, but for your information:
+
+### Example: Subsampling SNPs Using VCFtools
+
+For demonstration purposes, here's an example of how to subsample SNPs from a large VCF file using **vcftools**. This code is **not meant to be run within R**, but serves as a reference for working with large datasets.
+
+````{bash, eval=FALSE}
+# Step 1: Randomly select 5000 SNP positions from the original gzipped VCF
+module load vcftools
+vcftools --gzvcf /uufs/chpc.utah.edu/common/home/saarman-group1/pine/diploid_Pydts_final.vcf.gz --max-alleles 2 --min-alleles 2 --recode --recode-INFO-all --stdout | grep -v "^#" | shuf -n 5000 | cut -f1,2 > random_snps.txt
+
+# Step 2: Extract the selected SNPs into a new VCF
+vcftools --gzvcf /uufs/chpc.utah.edu/common/home/saarman-group1/pine/diploid_Pydts_final.vcf.gz \
+  --positions random_snps.txt --recode --recode-INFO-all --out pine_subset
+````
+
+**Explanation:**
+- `--gzvcf diploid_Pydts_final.vcf.gz`: Input compressed VCF file.
+- `--max-alleles 2 --min-alleles 2`: Retain only biallelic SNPs.
+- `--stdout | grep -v "^#"`: Extracts SNP positions.
+- `shuf -n 5000 | cut -f1,2 > random_snps.txt`: Randomly selects 5000 SNPs and writes the list of SNPs to file.
+- `bcftools view -R random_snps.txt`: Extracts the chosen SNPs.
+- `--positions random_snps.txt --recode --recode-INFO-all`: Recode only selected SNPs to output VCF with all INFO fields preserved.
+- `--out pine_subset`: Output file prefix.
+
+*Note:* The output VCF (`pine_subset.recode.vcf`) will be provided to students for analysis.
+
+
+```{r import-vcf, eval = FALSE}
+vcf <- read.vcfR("pine_random_subset.recode.vcf")
+genind_obj <- vcfR2genind(vcf)
+```
+
+### PCA Analysis
+
+```{r pca-vcf, eval=FALSE}
+pca_result <- dudi.pca(genind_obj, cent=FALSE, scale=TRUE, scannf=FALSE, nf=4)
+
+# Plotting PCA
+plot(pca_result$li, main="PCA of Pine Hybrid Zone")
+```
+
+**Interpretation Questions for PCA Analysis:**
+
+- What patterns do you observe in the PCA plot?
+- Are there distinct clusters indicating population structure?
+- How does the spread of individuals relate to hybridization?
+
+### Admixture Analysis
+
+```{r admixture-analysis,eval=FALSE}
+# Convert VCF to genotype matrix
+genotypes <- tab(genind_obj, NA.method = "mean")
+
+# Running sNMF (admixture analysis)
+project <- snmf(genotypes, K = 2:5, entropy = TRUE, repetitions = 10, project = "new")
+
+# Plot the best K
+best_k <- which.min(cross.entropy(project, K = 2:5))
+plot(project, K = best_k)
+```
+
+**Interpretation Questions for Admixture Analysis:**
+
+- What is the best-supported number of clusters (K) based on the cross-entropy plot?
+- How do individual admixture proportions vary across clusters?
+- Are there signs of recent hybridization based on mixed ancestry?
+
+### Genomic Cline Analysis
+
+#### Introduction
+
+Genomic clines describe the change in allele frequency across hybrid zones. Loci that deviate from expected cline patterns may be under selection, indicating adaptive introgression or barriers to gene flow.
+
+#### Estimating Genomic Clines
+
+```{r genomic-cline, eval=FALSE}
+# Prepare hybrid index based on admixture proportions
+hybrid_index <- project$Q[, best_k]
+
+# Example using hzar package for one SNP
+cline_model <- hzar.doMolecularData1DPops(hybrid_index, genotypes[, 1], model = "free")
+cline_fit <- hzar.first.fitRequest.old.ML(cline_model)
+
+# Fitting clines for all SNPs
+clines_list <- lapply(1:ncol(genotypes), function(i) {
+  cline_model <- hzar.doMolecularData1DPops(hybrid_index, genotypes[, i], model = "free")
+  hzar.first.fitRequest.old.ML(cline_model)
+})
+```
+
+#### Identifying Outlier Loci
+
+```{r find-outliers, eval=FALSE}
+# Extract cline parameters (center and width)
+cline_centers <- sapply(clines_list, function(x) x$data$param.center)
+cline_widths <- sapply(clines_list, function(x) x$data$param.width)
+
+# Identify outliers based on extreme center or width values
+center_outliers <- which(cline_centers > quantile(cline_centers, 0.975) | cline_centers < quantile(cline_centers, 0.025))
+width_outliers <- which(cline_widths > quantile(cline_widths, 0.975) | cline_widths < quantile(cline_widths, 0.025))
+
+# Combine outliers
+outlier_loci <- unique(c(center_outliers, width_outliers))
+```
+
+#### Plotting Genomic Clines
+
+```{r plot-clines, eval=FALSE}
+# Plot clines for outlier loci
+par(mfrow = c(2, 2))
+for (i in outlier_loci[1:4]) {  # Plot first 4 outliers as an example
+  plot(hybrid_index, genotypes[, i], main = paste("Genomic Cline - SNP", i), 
+       xlab = "Hybrid Index", ylab = "Genotype Frequency")
+  lines(hybrid_index, predict(clines_list[[i]]), col = "red")
+}
+```
+
+## Class Discussion
+
+- What can genomic clines tell us about the evolutionary processes in hybrid zones?
+- How do outlier loci help identify potential adaptive introgression?
+
+## Part 5: Bringing it all together Interpretation Exercise
+
+Write a paragraph explaining:
+
+- What patterns do you observe in the PCA plot?
+- What is the best-supported number of clusters (K) in the admixture analysis?
+- Which loci showed outlier behavior in genomic cline analysis?
+- What might explain these outlier patterns (e.g., selection, barriers to gene flow)?
+- How do genomic cline patterns compare to admixture and PCA results?
+
+## References
+
+- Nei, M. (1987). *Molecular Evolutionary Genetics*. Columbia University Press.
+- Guo, Y., Smith, J., & Anderson, C. (2023). *Genomic clines and genotype-by-environment associations*. *Evolutionary Ecology*, 37(2), 123-135.
+- Schweizer, R. M., Saarman, N. P., Ramstad, K. M., Forester, B. R., Kelley, J. L., Hand, B. K., Malison, R. L., Ackiss, A. S., Watsa, M., & Nelson, T. C. (2021). *Big Data in Conservation Genomics: Boosting Skills, Hedging Bets, and Staying Current in the Field*. *Journal of Heredity*, 112(4), 313–327. https://doi.org/10.1093/jhered/esab019
